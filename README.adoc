@@ -25,21 +25,21 @@ $ remotelogger-cli.py --config test/config.yaml
 
 Configuration file points to the log files to follow and defines filters to categorize log lines. 
 
-Filters are based on regular expressions and uses [re](https://docs.python.org/2/library/re.html) library to match patterns.
+Filters are based on regular expressions and uses (re)[https://docs.python.org/2/library/re.html] library to match patterns.
 
 Once a log line is filtered, some properties can be defined per filter:
 
-- **severity**: Severity level of the message (*NONE, INFO, WARNING, ERROR, SUCCESS*)
-- **verbosity**: Verbosity level (*None or 0-5*)
-- **progress**: Percentage of progress (*0-100*)
+- **severity**: Severity level of the message (_NONE, INFO, WARNING, ERROR, SUCCESS_)
+- **verbosity**: Verbosity level (_None or 0-5_)
+- **progress**: Percentage of progress (_0-100_)
 
 ## Regular expressions
 
 To filter a particular line of your log file you have to define the regular expression pattern.
 
-Patterns [sintax](https://docs.python.org/2/library/re.html#regular-expression-syntax) are based on [re](https://docs.python.org/2/library/re.html) library
+Patterns (sintax)[https://docs.python.org/2/library/re.html#regular-expression-syntax] are based on (re)[https://docs.python.org/2/library/re.html] library
 
-The filter feature is based on [re.match](https://docs.python.org/2/library/re.html#re.match) function.
+The filter feature is based on (re.match)[https://docs.python.org/2/library/re.html#re.match] function.
 
 ## Config file example
 
@@ -50,15 +50,15 @@ Configuration file is in YAML format.
     {
         "filename": log.txt,
         "filters": [
-            {pattern: "^h", verbosity: 1, severity: 1, progress: 1}, 
-            {pattern: "^b", verbosity: 2, severity: 2, progress: 2}
+            {pattern: "^INFO", verbosity: 1, severity: 1, progress: 1}, 
+            {pattern: "^WARN", verbosity: 2, severity: 2, progress: 2}
         ]
     },
     {
         "filename": log2.txt,
         "filters": [
-            {pattern: "^5", verbosity: 3, severity: 3, progress: 3}, 
-            {pattern: "^q", verbosity: 4, severity: 4, progress: 4}
+            {pattern: "^ERROR", verbosity: 3, severity: 3, progress: 3}, 
+            {pattern: "^OK", verbosity: 4, severity: 4, progress: 4}
         ]
     }
 ]
