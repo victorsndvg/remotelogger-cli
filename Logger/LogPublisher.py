@@ -5,10 +5,6 @@ import pika
 import json
 import uuid
 
-LOG_FORMAT = ('%(levelname) -10s %(asctime)s %(name) -30s %(funcName) '
-              '-35s %(lineno) -5d: %(message)s')
-
-
 class RemoteLogConsumerDispacher(object):
 
     def __init__(self, amqp_url, exchange, exchange_type, queue, routing_key, logger):
@@ -18,15 +14,63 @@ class RemoteLogConsumerDispacher(object):
         self._queue          = queue
         self._routing_key    = routing_key
         self._logger         = logger
-        self._connection     = pika.BlockingConnection(pika.ConnectionParameters(host=amqp_url))
-        self._channel        = self._connection.channel()
-        result               = self._channel.queue_declare(exclusive=True)
+
+        self._connection     = None
+        self._channel        = None
+        self._callback_queue = None
+
+    def connect(self):
+        self._logger.debug('Connecting: %s' % self._amqp_url)
+        self._connection = pika.BlockingConnection(pika.ConnectionParameters(host=self._amqp_url))
+
+    def channel_open(self):
+        self._logger.debug('Opening channel')
+        self._channel = self._connection.channel()
+
+    def exchange_open(self):
+        if self._exchange: 
+            self._logger.debug('Opening exchange: %s (%s)' % self._exchange, self._exchange_type)
+            self._channel.exchange_declare(exchange=self._exchange, exchange_type=self._exchange_type)
+
+    def queue_open(self):
+        self._logger.debug('Opening queue: %s' % self._queue)
+        self._channel.queue_declare(queue=self._queue)
+
+    def callback_queue_open(self):
+        self._logger.debug('Opening callback queue')
+        result = self._channel.queue_declare(exclusive=True)
         self._callback_queue = result.method.queue
         self._channel.basic_consume(self.on_response, no_ack=True, queue=self._callback_queue)
 
     def on_response(self, ch, method, props, body):
         if self._correlation_id == props.correlation_id:
-            self._logger.info("Dispatch response: %r" % body)
+            self._logger.info('Dispatch response: %s' % body)
+            self.response = body
+
+    def disconnect(self):
+        self._logger.debug('Disconnecting')
+        self._connection.close()
+
+    def channel_close(self):
+        self._logger.debug('Closing channel')
+        self._channel.close()
+
+    def exchange_close(self):
+        if self._exchange: 
+            self._logger.debug('Closing exchange: %s' % self._exchange)
+            self._channel.exchange_delete(exchange=self._exchange)
+
+    def queue_close(self):
+        self._logger.debug('Closing queue: %s' % self._queue)
+        self._channel.queue_delete(queue=self._queue)
+
+    def callback_queue_close(self):
+        self._logger.debug('Clossing callback queue')
+        result = self._channel.queue_delete(self._queue)
+
+    def on_response(self, ch, method, props, body):
+        if self._correlation_id == props.correlation_id:
+            self._logger.info('Dispatch response: %s' % body)
             self.response = body
 
     def dispatch(self, exchange, exchange_type, queue, routing_key):
@@ -40,10 +84,31 @@ class RemoteLogConsumerDispacher(object):
                                          correlation_id = self._correlation_id,
                                          ),
                                    body=message)
-        self._logger.info("Dispatch consumer on: %r" % message)
+        self._logger.info('Dispatch consumer on: %r' % message)
         while self.response is None:
             self._connection.process_data_events()
         return self.response
+
+    def setup(self):
+        self.connect()
+        self.channel_open()
+        self.exchange_open()
+        self.queue_open()
+        self.callback_queue_open()
+
+    def cleanup(self):
+        self.callback_queue_close()
+        self.queue_close()
+        self.exchange_close()
+        self.channel_close()
+        self.disconnect()
+
+    def run(self):
+        self.setup()
+        self.dispatch(exchange, exchange_type, queue, routing_key)
+        self.cleanup()
+
+
 
 class LogPublisher(object):
 
@@ -63,150 +128,150 @@ class LogPublisher(object):
         self._queue          = queue
         self._routing_key    = routing_key
         self._logger         = logger
-        self._dispatcher     = RemoteLogConsumerDispacher('127.0.0.1', '', '', '', 'rpc_queue', logger)
 
     def connect(self):
-        self._logger.info('Connecting to %s', self._url)
-        self._dispatcher.dispatch(self._exchange, self._exchange_type, self._queue, self._routing_key)
-        return pika.SelectConnection(pika.URLParameters(self._url),
-                                     self.on_connection_open,
-                                     stop_ioloop_on_close=False)
+        self._logger.info('Connecting: %s' % self._url)
+        self._connection = pika.BlockingConnection(pika.ConnectionParameters(host=self._url))
+        self._connection.add_on_connection_blocked_callback(self.connection_blocked_callback)
+        self._connection.add_on_connection_unblocked_callback(self.connection_unblocked_callback)
+#        self._connection.add_on_close_callback(self.connection_close_callback)
+#        self._connection.add_on_open_callback(self.connection_open_callback)
+#        self._connection.add_on_open_error_callback(self.connection_open_error_callback)
 
-    def on_connection_open(self, unused_connection):
-        self._logger.info('Connection opened')
-        self.add_on_connection_close_callback()
-        self.open_channel()
+    def channel_open(self):
+        self._logger.info('Opening channel')
+        self._channel = self._connection.channel()
+        self._channel.confirm_delivery()
+#        self._channel.add_callback(self.channel_callback)
+        self._channel.add_on_cancel_callback(self.channel_cancel_callback)
+        self._channel.add_on_return_callback(self.channel_return_callback)
+#        self._channel.add_on_close_callback(self.channel_close_callback)
+#        self._channel.add_on_flow_callback(self.channel_flow_callback)
+#        self._channel.add_on_cancel_callback(self.channel_cancel_callback)
 
-    def add_on_connection_close_callback(self):
-        self._logger.info('Adding connection close callback')
-        self._connection.add_on_close_callback(self.on_connection_closed)
+    def exchange_open(self):
+        self._logger.info('Opening exchange: %s (%s)' % (self._exchange, self._exchange_type))
+        self._channel.exchange_declare(exchange=self._exchange, exchange_type=self._exchange_type)
 
-    def on_connection_closed(self, connection, reply_code, reply_text):
-        self._channel = None
-        if self._closing:
-            self._connection.ioloop.stop()
-        else:
-            self._logger.warning('Connection closed, reopening in 5 seconds: (%s) %s', reply_code, reply_text)
-            self._connection.add_timeout(5, self.reconnect)
+    def queue_open(self):
+        self._logger.info('Opening queue: %s' % self._queue)
+        self._channel.queue_declare(queue=self._queue)
 
-    def reconnect(self):
-        self._deliveries = []
-        self._acked = 0
-        self._nacked = 0
-        self._message_number = 0
-        self._connection.ioloop.stop()
-        self._connection = self.connect()
-        self._connection.ioloop.start()
+    def queue_bind(self):
+        self._logger.info('Binding queue "%s" to exchange "%s" with key "%s"' % (self._queue, self._exchange, self._routing_key))
+        self._channel.queue_bind(queue=self._queue, exchange=self._exchange, routing_key=self._routing_key)
 
-    def open_channel(self):
-        self._logger.info('Creating a new channel')
-        self._connection.channel(on_open_callback=self.on_channel_open)
-
-    def on_channel_open(self, channel):
-        self._logger.info('Channel opened')
-        self._channel = channel
-        self.add_on_channel_close_callback()
-        self.setup_exchange(self._exchange)
-
-    def add_on_channel_close_callback(self):
-        self._logger.info('Adding channel close callback')
-        self._channel.add_on_close_callback(self.on_channel_closed)
-
-    def on_channel_closed(self, channel, reply_code, reply_text):
-        self._logger.warning('Channel was closed: (%s) %s', reply_code, reply_text)
-        if not self._closing:
-            self._connection.close()
-
-    def setup_exchange(self, exchange_name):
-        self._logger.info('Declaring exchange %s', exchange_name)
-        self._channel.exchange_declare(self.on_exchange_declareok,
-                                       exchange_name,
-                                       self._exchange_type)
-
-    def on_exchange_declareok(self, unused_frame):
-        self._logger.info('Exchange declared')
-        self.setup_queue(self._queue)
-
-    def setup_queue(self, queue_name):
-        self._logger.info('Declaring queue %s', queue_name)
-        self._channel.queue_declare(self.on_queue_declareok, queue_name)
-
-
-    def on_queue_declareok(self, method_frame):
-        self._logger.info('Binding %s to %s with %s', self._exchange, self._queue, self._routing_key)
-        self._channel.queue_bind(self.on_bindok, self._queue, self._exchange, self._routing_key)
-
-    def on_bindok(self, unused_frame):
-        self._logger.info('Queue bound')
-        self.start_publishing()
-
-    def start_publishing(self):
-        self._logger.info('Issuing consumer related RPC commands')
-        self.enable_delivery_confirmations()
-
-    def enable_delivery_confirmations(self):
-        self._logger.info('Issuing Confirm.Select RPC command')
-        self._channel.confirm_delivery(self.on_delivery_confirmation)
+    def send_message(self, message):
+        self._logger.info('Sending message: %s' % message)
+        delivery = self._channel.basic_publish(exchange=self._exchange, routing_key=self._routing_key, body=message,
+                                           properties=pika.BasicProperties(content_type='application/json', delivery_mode=1), mandatory=True)
 
     def on_delivery_confirmation(self, method_frame):
         confirmation_type = method_frame.method.NAME.split('.')[1].lower()
-        self._logger.info('Received %s for delivery tag: %i', confirmation_type, method_frame.method.delivery_tag)
+        self._logger.info('Received %s for delivery tag: %i',confirmation_type, method_frame.method.delivery_tag)
         if confirmation_type == 'ack':
             self._acked += 1
         elif confirmation_type == 'nack':
             self._nacked += 1
         self._deliveries.remove(method_frame.method.delivery_tag)
-        self._logger.info('Published %i messages, %i have yet to be confirmed, %i were acked and %i were nacked',
-                            self._message_number, len(self._deliveries), self._acked, self._nacked)
+        self._logger.info('Published %i messages, %i have yet to be confirmed, %i were acked and %i were nacked', self._message_number, len(self._deliveries), self._acked, self._nacked)
 
-    def publish_message(self, message):
-        if self._stopping:
-            return
+    def channel_close(self):
+        self._logger.info('Closing channel')
+        self._channel.close()
 
-        properties = pika.BasicProperties(app_id='remotelogger-cli', content_type='application/json', headers=message)
+    def exchange_close(self):
+        self._logger.info('Clsing exchange: %s' % self._exchange)
+        self._channel.exchange_delete(exchange=self._exchange)
 
-        self._channel.basic_publish(self._exchange, self._routing_key,json.dumps(message, ensure_ascii=False), properties)
-        self._message_number += 1
-        self._deliveries.append(self._message_number)
-        self._logger.info('Published message # %i: %s', self._message_number, message)
+    def queue_close(self):
+        self._logger.info('Closing queue: %s' % self._queue)
+        self._channel.queue_delete(queue=self._queue)
 
-    def close_queue(self):
-        self._logger.info('Closing the queue')
-        self._channel.queue_delete(queue=self._queue, if_unused=False, if_empty=True)
+    def queue_unbind(self):
+        self._logger.info('Unbinding queue "%s" from exchange "%s" with key "%s"' % (self._queue, self._exchange, self._routing_key))
+        self._channel.queue_unbind(queue=self._queue, exchange=self._exchange, routing_key=self._routing_key)
 
-    def close_exchange(self):
-        self._logger.info('Closing the exchange')
-        self._channel.exchange_delete(exchange=self._exchange, if_unused=False)
-
-    def close_channel(self):
-        self._logger.info('Closing the channel')
-        if self._channel:
-            self._channel.close()
-
-    def run(self):
-        self._connection = self.connect()
-        self._connection.ioloop.start()
-
-    def stop(self):
-        self._logger.info('Stopping')
-        self._stopping = True
-        self.close_queue()
-        self.close_exchange()
-        self.close_channel()
-        self.close_connection()
-        self._connection.ioloop.stop()
-        self._logger.info('Stopped')
-
-    def close_connection(self):
-        self._logger.info('Closing connection')
-        self._closing = True
+    def disconnect(self):
+        self._logger.info('Disconnecting')
         self._connection.close()
 
+    def connection_blocked_callback(self, unused_frame):
+        self._logger.info('Connection blocked callback')
+
+    def connection_unblocked_callback(self, unused_frame):
+        self._logger.info('Connection unblocked callback')
+
+    def connection_backpressure_callback(self, unused_frame):
+        self._logger.info('Connection backpressure callback')
+
+    def connection_close_callback(self, unused_frame):
+        self._logger.info('Connection close callback')
+
+    def connection_open_callback(self, unused_frame):
+        self._logger.info('Connection open callback')
+
+    def connection_open_error_callback(self, unused_frame):
+        self._logger.info('Connection open_error callback')
+
+    def channel_cancel_callback(self, unused_frame):
+        self._logger.info('Channel cancel callback')
+
+    def channel_return_callback(self, unused_frame):
+        self._logger.info('Channel return callback')
+
+    def channel_callback(self, unused_frame):
+        self._logger.info('Channel callback')
+
+    def channel_close_callback(self, unused_frame):
+        self._logger.info('Channel close callback')
+
+    def channel_flow_callback(self, unused_frame):
+        self._logger.info('Channel flow callback')
+
+
+
+
+
+
+
+
+
 if __name__ == '__main__':
-    logging.basicConfig(level=logging.INFO)#, format=LOG_FORMAT)
-    publisher = LogPublisher('amqp://guest:guest@localhost:5672/%2F?connection_attempts=3&heartbeat_interval=3600',
-                            'logs', 'direct', 'logs', 'logs', logging.getLogger(__name__))
-    try:
-        publisher.run()
-    except KeyboardInterrupt:
-        publisher.stop()
+    LOG_FORMAT = ('%(levelname) -10s %(lineno) -5d: %(message)s')
+    logging.basicConfig(level=logging.INFO, format=LOG_FORMAT)
+    logger = logging.getLogger(__name__)
+    url           = 'amqp://guest:guest@localhost:5672/%2F?connection_attempts=3&heartbeat_interval=3600'
+    url           = 'localhost'
+    exchange      = 'exchange'
+    exchange_type = 'direct'
+    queue         = 'queue'
+    routing_key   = 'routing_key'
+    dispatcher  = RemoteLogConsumerDispacher('localhost', '', '', '', 'rpc_queue', logger)
+    dispatcher.run()
+
+    if True:
+
+        publisher  = LogPublisher(url, exchange, exchange_type, queue, routing_key, logger)
+        publisher.connect()
+        publisher.channel_open()
+        publisher.exchange_open()
+        publisher.queue_open()
+        publisher.queue_bind()
+
+        for i in range(1,2):
+            publisher.send_message('hola'+str(i))
+
+        publisher.queue_unbind()
+        publisher.queue_close()
+        publisher.exchange_close()
+        publisher.channel_close()
+        publisher.disconnect()
+
+
+
+
+#    try:
+#        publisher.run()
+#    except KeyboardInterrupt:
+#        publisher.stop()
