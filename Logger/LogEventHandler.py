@@ -6,12 +6,15 @@ from watchdog.events import PatternMatchingEventHandler
 
 
 class LogEventHandler(PatternMatchingEventHandler):
-    def __init__(self, path, filters, patterns=None, ignore_patterns=None, ignore_directories=False, case_sensitive=False):
+    def __init__(self, path, filters, publisher, patterns=None, ignore_patterns=None, ignore_directories=False, case_sensitive=False):
         self._patterns           = patterns
         self._ignore_patterns    = ignore_patterns
         self._ignore_directories = ignore_directories
         self._case_sensitive     = case_sensitive
         self.file                = LogFileHandler(path, filters)
+        self.publisher           = publisher
+
+        self.publish()
 
         super(LogEventHandler, self).__init__(  patterns=self._patterns, 
                                                 ignore_patterns=self._ignore_patterns,
@@ -45,8 +48,14 @@ class LogEventHandler(PatternMatchingEventHandler):
     def on_modified(self, event):
         super(LogEventHandler, self).on_modified(event)
         logging.debug("Event: modify. File: {0}".format(event.src_path))
+        self.publish()
+
+    def publish(self):
         if(self.file.is_open()):
             self.file.tail()
+        buffer = self.file.get_buffer()
+        while not buffer.empty():
+            self.publisher.send(buffer.pop())
 
 
 

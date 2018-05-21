@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 import os, re, json
 from LogFilter import LogFilter, LogFilterSet
-            
+
 
 class LogBuffer():
 
@@ -11,8 +11,8 @@ class LogBuffer():
         self.stack = []
 
     def append(self, string):
-        #self.stack.append(self.filters.apply(string))
-        print self.filters.apply(string)
+        self.stack.append(self.filters.apply(string))
+        #print self.filters.apply(string)
 
     def push(self, string):
         self.temp += string
@@ -25,8 +25,11 @@ class LogBuffer():
             self.temp = ''
             self.append(line)
 
+    def empty(self):
+        return not self.stack
+
     def pop(self):
         if self.stack:
-            self.stack.pop(0)
-            
+            return self.stack.pop(0)
+
 

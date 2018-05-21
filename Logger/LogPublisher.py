@@ -29,7 +29,7 @@ class RemoteLogConsumerDispacher(object):
 
     def exchange_open(self):
         if self._exchange: 
-            self._logger.debug('Opening exchange: %s (%s)' % self._exchange, self._exchange_type)
+            self._logger.info('Opening exchange: %s (%s)' % (self._exchange, self._exchange_type))
             self._channel.exchange_declare(exchange=self._exchange, exchange_type=self._exchange_type)
 
     def queue_open(self):
@@ -89,25 +89,19 @@ class RemoteLogConsumerDispacher(object):
             self._connection.process_data_events()
         return self.response
 
-    def setup(self):
+    def start(self):
         self.connect()
         self.channel_open()
         self.exchange_open()
         self.queue_open()
         self.callback_queue_open()
 
-    def cleanup(self):
+    def stop(self):
         self.callback_queue_close()
         self.queue_close()
         self.exchange_close()
         self.channel_close()
         self.disconnect()
-
-    def run(self):
-        self.setup()
-        self.dispatch(exchange, exchange_type, queue, routing_key)
-        self.cleanup()
-
 
 
 class LogPublisher(object):
@@ -128,6 +122,25 @@ class LogPublisher(object):
         self._queue          = queue
         self._routing_key    = routing_key
         self._logger         = logger
+
+        dispatcher  = RemoteLogConsumerDispacher(amqp_url, '', '', '', 'rpc_queue', logger)
+        dispatcher.start()
+        dispatcher.dispatch(exchange, exchange_type, queue, routing_key)
+        dispatcher.stop()
+
+    def start(self):
+        self.connect()
+        self.channel_open()
+        self.exchange_open()
+        self.queue_open()
+        self.queue_bind()
+
+    def stop(self):
+        self.queue_unbind()
+        self.queue_close()
+        self.exchange_close()
+        self.channel_close()
+        self.disconnect()
 
     def connect(self):
         self._logger.info('Connecting: %s' % self._url)
@@ -161,7 +174,7 @@ class LogPublisher(object):
         self._logger.info('Binding queue "%s" to exchange "%s" with key "%s"' % (self._queue, self._exchange, self._routing_key))
         self._channel.queue_bind(queue=self._queue, exchange=self._exchange, routing_key=self._routing_key)
 
-    def send_message(self, message):
+    def send(self, message):
         self._logger.info('Sending message: %s' % message)
         delivery = self._channel.basic_publish(exchange=self._exchange, routing_key=self._routing_key, body=message,
                                            properties=pika.BasicProperties(content_type='application/json', delivery_mode=1), mandatory=True)
@@ -247,8 +260,8 @@ if __name__ == '__main__':
     exchange_type = 'direct'
     queue         = 'queue'
     routing_key   = 'routing_key'
-    dispatcher  = RemoteLogConsumerDispacher('localhost', '', '', '', 'rpc_queue', logger)
-    dispatcher.run()
+#    dispatcher  = RemoteLogConsumerDispacher('localhost', '', '', '', 'rpc_queue', logger)
+#    dispatcher.run()
 
     if True:
 
@@ -260,7 +273,7 @@ if __name__ == '__main__':
         publisher.queue_bind()
 
         for i in range(1,2):
-            publisher.send_message('hola'+str(i))
+            publisher.send('hola'+str(i))
 
         publisher.queue_unbind()
         publisher.queue_close()
