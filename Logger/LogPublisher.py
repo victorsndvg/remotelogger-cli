@@ -7,8 +7,12 @@ import uuid
 
 class RemoteLogConsumerDispacher(object):
 
-    def __init__(self, amqp_url, exchange, exchange_type, queue, routing_key, logger):
-        self._amqp_url       = amqp_url
+    def __init__(self, config, exchange, exchange_type, queue, routing_key, logger):
+        self._host           = config['host']
+        self._port           = config['port']
+        self._user           = config['user']
+        self._pass           = config['pass']
+        self._url            = 'amqp://'+self._user+':'+self._pass+'@'+self._host+':'+str(self._port)+'/'
         self._exchange       = exchange
         self._exchange_type  = exchange_type
         self._queue          = queue
@@ -20,8 +24,10 @@ class RemoteLogConsumerDispacher(object):
         self._callback_queue = None
 
     def connect(self):
-        self._logger.debug('Connecting: %s' % self._amqp_url)
-        self._connection = pika.BlockingConnection(pika.ConnectionParameters(host=self._amqp_url))
+        self._logger.debug('Connecting: %s' % self._url)
+        credentials = pika.PlainCredentials(self._user, self._pass) 
+        parameters = pika.ConnectionParameters(host=self._host, port=self._port, credentials=credentials) 
+        self._connection = pika.BlockingConnection(parameters)
 
     def channel_open(self):
         self._logger.debug('Opening channel')
@@ -106,7 +112,7 @@ class RemoteLogConsumerDispacher(object):
 
 class LogPublisher(object):
 
-    def __init__(self, amqp_url, exchange, exchange_type, queue, routing_key, logger):
+    def __init__(self, config, logger):
         self._connection     = None
         self._channel        = None
         self._deliveries     = []
@@ -116,16 +122,22 @@ class LogPublisher(object):
         self._stopping       = False
         self._closing        = False
 
-        self._url            = amqp_url
-        self._exchange       = exchange
-        self._exchange_type  = exchange_type
-        self._queue          = queue
-        self._routing_key    = routing_key
+        self._url            = 'amqp://'+config['user']+':'+config['pass']+'@'+config['host']+':'+str(config['port'])+'/'
+        self._host           = config['host']
+        self._port           = config['port']
+        self._user           = config['user']
+        self._pass           = config['pass']
+        self._exchange       = config['exchange']
+        self._exchange_type  = config['exchange_type']
+        self._queue          = config['queue']
+        self._routing_key    = config['routing_key']
+        self._heartbeat      = config['heartbeat']
+        self._blocked_timeout= config['blocked_connection_timeout']
         self._logger         = logger
 
-        dispatcher  = RemoteLogConsumerDispacher(amqp_url, '', '', '', 'rpc_queue', logger)
+        dispatcher  = RemoteLogConsumerDispacher(config, '', '', '', 'rpc_queue', logger)
         dispatcher.start()
-        dispatcher.dispatch(exchange, exchange_type, queue, routing_key)
+        dispatcher.dispatch(self._exchange, self._exchange_type, self._queue, self._routing_key)
         dispatcher.stop()
 
     def start(self):
@@ -144,23 +156,18 @@ class LogPublisher(object):
 
     def connect(self):
         self._logger.info('Connecting: %s' % self._url)
-        self._connection = pika.BlockingConnection(pika.ConnectionParameters(host=self._url))
+        credentials = pika.PlainCredentials(self._user, self._pass) 
+        parameters = pika.ConnectionParameters(host=self._host, port=self._port, credentials=credentials, heartbeat_interval=self._heartbeat) 
+        self._connection = pika.BlockingConnection(parameters)
         self._connection.add_on_connection_blocked_callback(self.connection_blocked_callback)
         self._connection.add_on_connection_unblocked_callback(self.connection_unblocked_callback)
-#        self._connection.add_on_close_callback(self.connection_close_callback)
-#        self._connection.add_on_open_callback(self.connection_open_callback)
-#        self._connection.add_on_open_error_callback(self.connection_open_error_callback)
 
     def channel_open(self):
         self._logger.info('Opening channel')
         self._channel = self._connection.channel()
         self._channel.confirm_delivery()
-#        self._channel.add_callback(self.channel_callback)
         self._channel.add_on_cancel_callback(self.channel_cancel_callback)
         self._channel.add_on_return_callback(self.channel_return_callback)
-#        self._channel.add_on_close_callback(self.channel_close_callback)
-#        self._channel.add_on_flow_callback(self.channel_flow_callback)
-#        self._channel.add_on_cancel_callback(self.channel_cancel_callback)
 
     def exchange_open(self):
         self._logger.info('Opening exchange: %s (%s)' % (self._exchange, self._exchange_type))
