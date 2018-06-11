@@ -23,7 +23,7 @@ class LogBuffer():
                 self.temp = line
                 break
             self.temp = ''
-            self.append(line)
+            self.append(line.rstrip())
 
     def empty(self):
         return not self.stack

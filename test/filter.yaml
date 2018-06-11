@@ -2,15 +2,15 @@
     {
         "filename": log.txt,
         "filters": [
-            {pattern: "^h", verbosity: 1, severity: 1, progress: 1}, 
-            {pattern: "^b", verbosity: 2, severity: 2, progress: 2}
+            {pattern: "^h", verbosity: 1, severity: "CRITICAL", progress: 1}, 
+            {pattern: "^b", verbosity: 2, severity: "ERROR", progress: 2}
         ]
     },
     {
         "filename": log2.txt,
         "filters": [
-            {pattern: "^5", verbosity: 3, severity: 3, progress: 3}, 
-            {pattern: "^q", verbosity: 4, severity: 4, progress: 4}
+            {pattern: "^5", verbosity: 3, severity: "WARNING", progress: 3}, 
+            {pattern: "^q", verbosity: 4, severity: "INFO", progress: 4}
         ]
     }
 ]
