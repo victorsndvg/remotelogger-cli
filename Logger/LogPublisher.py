@@ -64,11 +64,11 @@ class RemoteLogConsumerDispacher(object):
     def exchange_close(self):
         if self._exchange: 
             self._logger.debug('Closing exchange: %s' % self._exchange)
-            self._channel.exchange_delete(exchange=self._exchange)
+            self._channel.exchange_delete(exchange=self._exchange, if_unused=True)
 
     def queue_close(self):
         self._logger.debug('Closing queue: %s' % self._queue)
-        self._channel.queue_delete(queue=self._queue)
+        self._channel.queue_delete(queue=self._queue, if_unused=True, if_empty=True)
 
     def callback_queue_close(self):
         self._logger.debug('Clossing callback queue')
@@ -113,6 +113,8 @@ class RemoteLogConsumerDispacher(object):
 class LogPublisher(object):
 
     def __init__(self, config, logger):
+        self._config         = config
+
         self._connection     = None
         self._channel        = None
         self._deliveries     = []
@@ -130,17 +132,19 @@ class LogPublisher(object):
         self._exchange       = config['exchange']
         self._exchange_type  = config['exchange_type']
         self._queue          = config['queue']
-        self._routing_key    = config['routing_key']
+        self._routing_key    = config['routing_key']+'.'+config['queue']
         self._heartbeat      = config['heartbeat']
         self._blocked_timeout= config['blocked_connection_timeout']
         self._logger         = logger
 
-        dispatcher  = RemoteLogConsumerDispacher(config, '', '', '', 'rpc_queue', logger)
+    def dispatch(self):
+        dispatcher  = RemoteLogConsumerDispacher(self._config, '', '', '', 'rpc_queue', self._logger)
         dispatcher.start()
         dispatcher.dispatch(self._exchange, self._exchange_type, self._queue, self._routing_key)
         dispatcher.stop()
 
     def start(self):
+        self.dispatch()
         self.connect()
         self.channel_open()
         self.exchange_open()
@@ -153,6 +157,10 @@ class LogPublisher(object):
         self.exchange_close()
         self.channel_close()
         self.disconnect()
+
+    def restart(self):
+        self.stop()
+        self.start()
 
     def connect(self):
         self._logger.info('Connecting: %s' % self._url)
@@ -185,6 +193,8 @@ class LogPublisher(object):
         self._logger.info('Sending message: %s' % message)
         delivery = self._channel.basic_publish(exchange=self._exchange, routing_key=self._routing_key, body=message,
                                            properties=pika.BasicProperties(content_type='application/json', delivery_mode=1), mandatory=True)
+        if not delivery:
+            self.restart()
 
     def on_delivery_confirmation(self, method_frame):
         confirmation_type = method_frame.method.NAME.split('.')[1].lower()
