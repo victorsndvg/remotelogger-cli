@@ -1,3 +1,3 @@
 FROM python:2-alpine
 
-RUN pip install watchdog
+RUN pip install watchdog; pip install pika

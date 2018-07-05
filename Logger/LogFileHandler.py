@@ -42,3 +42,7 @@ class LogFileHandler():
                 logging.debug("Action: Tail {0}: {1}".format(self.path, data))
                 self.buffer.push(data)
 
+    def get_buffer(self):
+        return self.buffer
+
+

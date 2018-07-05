@@ -1,0 +1,16 @@
+[
+    {
+        "filename": log.txt,
+        "filters": [
+            {pattern: "^h", verbosity: 1, severity: "CRITICAL", progress: 1}, 
+            {pattern: "^b", verbosity: 2, severity: "ERROR", progress: 2}
+        ]
+    },
+    {
+        "filename": log2.txt,
+        "filters": [
+            {pattern: "^5", verbosity: 3, severity: "WARNING", progress: 3}, 
+            {pattern: "^q", verbosity: 4, severity: "INFO", progress: 4}
+        ]
+    }
+]
