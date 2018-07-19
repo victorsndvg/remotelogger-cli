@@ -132,7 +132,8 @@ class LogPublisher(object):
         self._exchange       = config['exchange']
         self._exchange_type  = config['exchange_type']
         self._queue          = config['queue']
-        self._routing_key    = config['routing_key']+'.'+config['queue']
+        self._routing_key    = config['routing_key']
+        self._topic          = config['routing_key']+'.'+config['queue']
         self._heartbeat      = config['heartbeat']
         self._blocked_timeout= config['blocked_connection_timeout']
         self._logger         = logger
@@ -186,12 +187,12 @@ class LogPublisher(object):
         self._channel.queue_declare(queue=self._queue)
 
     def queue_bind(self):
-        self._logger.info('Binding queue "%s" to exchange "%s" with key "%s"' % (self._queue, self._exchange, self._routing_key))
-        self._channel.queue_bind(queue=self._queue, exchange=self._exchange, routing_key=self._routing_key)
+        self._logger.info('Binding queue "%s" to exchange "%s" with key "%s"' % (self._queue, self._exchange, self._topic))
+        self._channel.queue_bind(queue=self._queue, exchange=self._exchange, routing_key=self._topic)
 
     def send(self, message):
         self._logger.info('Sending message: %s' % message)
-        delivery = self._channel.basic_publish(exchange=self._exchange, routing_key=self._routing_key, body=message,
+        delivery = self._channel.basic_publish(exchange=self._exchange, routing_key=self._topic, body=message,
                                            properties=pika.BasicProperties(content_type='application/json', delivery_mode=1), mandatory=True)
         if not delivery:
             self.restart()
@@ -219,8 +220,8 @@ class LogPublisher(object):
         self._channel.queue_delete(queue=self._queue)
 
     def queue_unbind(self):
-        self._logger.info('Unbinding queue "%s" from exchange "%s" with key "%s"' % (self._queue, self._exchange, self._routing_key))
-        self._channel.queue_unbind(queue=self._queue, exchange=self._exchange, routing_key=self._routing_key)
+        self._logger.info('Unbinding queue "%s" from exchange "%s" with key "%s"' % (self._queue, self._exchange, self._topic))
+        self._channel.queue_unbind(queue=self._queue, exchange=self._exchange, routing_key=self._topic)
 
     def disconnect(self):
         self._logger.info('Disconnecting')
