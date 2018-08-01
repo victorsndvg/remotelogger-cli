@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-import sys, os, time, logging
+import sys, os, time, signal, logging
 from Logger.LogEventHandler import LogEventHandler
 from Logger.LogFilter import LogFilter, LogFilterSet
 from Logger.LogPublisher import LogPublisher
@@ -7,7 +7,29 @@ from watchdog.observers import Observer
 import argparse
 import yaml
 
+publisher = None
+observer = None
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
 
+
+def kill():
+    if publisher is not None:
+        publisher.stop()
+    if observer is not None:
+        observer.stop()
+
+def signal_handler(sig, frame):
+        logging.info('Gracefully closing remotelogger (Signal: {sinal}) ... '.format(signal=sig))
+        kill()
+        sys.exit(0)
+
+def signals_trap():
+    signal.signal(signal.SIGABRT,  signal_handler)
+    signal.signal(signal.SIGFPE,   signal_handler)
+    signal.signal(signal.SIGILL,   signal_handler)
+    signal.signal(signal.SIGINT,   signal_handler)
+    signal.signal(signal.SIGSEGV,  signal_handler)
+    signal.signal(signal.SIGTERM,  signal_handler)
 
 def log(path, filters, observer, publisher):
     dir = os.path.split(path)[0]
@@ -26,15 +48,20 @@ def log(path, filters, observer, publisher):
 
 def parse():
     parser = argparse.ArgumentParser("Send your logs to remote endpoints")
-    parser.add_argument('-c', '--config', dest='config', type=str, help='Path to config file', required=True)
-    parser.add_argument('-f', '--filter', dest='filter', type=str, help='Path to filter file', required=True)
-    parser.print_help()
-    args = parser.parse_args()
+    args = {'config': None, 'filter': None}
+
+    try:
+        parser.add_argument('-c', '--config', dest='config', type=str, help='Path to config file', required=True)
+        parser.add_argument('-f', '--filter', dest='filter', type=str, help='Path to filter file', required=True)
+        args = parser.parse_args()
+    except:
+        parser.print_help()
+
     return args
 
 
 if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
+    signals_trap()
     args = parse()
 
 
@@ -46,7 +73,7 @@ if __name__ == "__main__":
         except Exception as e:
             logging.error("[ERROR] Parsing CONFIG file: {0} {1} Please, check the YAML format".format(e, os.linesep))
 
-    publisher  = LogPublisher(config, logging)
+    publisher = LogPublisher(config, logging)
     publisher.start()
     observer = Observer()
 
@@ -68,6 +95,4 @@ if __name__ == "__main__":
         while True:
             time.sleep(1)
     except:
-        observer.stop()
-        publisher.stop()
-
+        kill()
