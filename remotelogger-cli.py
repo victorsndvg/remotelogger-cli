@@ -19,9 +19,9 @@ def kill():
         observer.stop()
 
 def signal_handler(sig, frame):
-        logging.info('Gracefully closing remotelogger (Signal: {sinal}) ... '.format(signal=sig))
-        kill()
-        sys.exit(0)
+    logging.info('Gracefully closing remotelogger (Signal: {sinal}) ... '.format(signal=sig))
+    kill()
+    sys.exit(0)
 
 def signals_trap():
     signal.signal(signal.SIGABRT,  signal_handler)
@@ -68,10 +68,12 @@ if __name__ == "__main__":
     with open(args.config, 'r') as stream:
         try:
             config = yaml.load(stream)
-            logging.info("Config file: {0} {1}".format(os.linesep, yaml.dump(config)))
+            logging.debug("Config file: {0} {1}".format(os.linesep, yaml.dump(config)))
             # validate(config_yaml, schema)
         except Exception as e:
             logging.error("[ERROR] Parsing CONFIG file: {0} {1} Please, check the YAML format".format(e, os.linesep))
+            kill()
+            sys.exit(0)
 
     publisher = LogPublisher(config, logging)
     publisher.start()
@@ -89,10 +91,14 @@ if __name__ == "__main__":
                 log(os.path.abspath(rule['filename']), filters, observer, publisher)  
         except Exception as e:
             logging.error("[ERROR] Parsing FILTER file: {0} {1} Please, check the YAML format".format(e, os.linesep))
+            kill()
+            sys.exit(0)
 
     observer.start()
+
     try:
         while True:
             time.sleep(1)
     except:
         kill()
+        sys.exit(0)
