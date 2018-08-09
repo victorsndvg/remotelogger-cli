@@ -50,12 +50,41 @@ def parse():
     parser = argparse.ArgumentParser("Send your logs to remote endpoints")
     args = {'config': None, 'filter': None}
 
+
+    
+    parser.add_argument('-f', '--filter', dest='filter', type=str, help='Path to filter file', required=True)
+    parser.add_argument('-c', '--config', dest='config', type=str, help='Path to config file')
+    parser.add_argument('-sh', '--host',          dest='host',          type=str, help='Server host')
+    parser.add_argument('-u', '--user',           dest='user',          type=str, help='Server username')
+    parser.add_argument('-p', '--pass',           dest='passwd',          type=str, help='Server password')
+    parser.add_argument('-e', '--exchange',       dest='exchange',      type=str, help='Exchange name')
+    parser.add_argument('-rk', '--routing_key',   dest='routing_key',   type=str, help='Routing key')
+    parser.add_argument('-q', '--queue',          dest='queue',         type=str, help='Queue name')
+    parser.add_argument('-sp', '--port',          dest='port',          type=int, default=5672, help='Server port')
+    parser.add_argument('-et', '--exchange_type', dest='exchange_type', type=str, default='direct', help='Exchange type')
+    parser.add_argument('-hb', '--heartbeat',      dest='heartbeat',     type=int, default=0,        help='Hearbeat')
+    parser.add_argument('-bct', '--blocked_connection_timeout', dest='blocked_connection_timeout', type=int, default=300, help='Blocked connection timeout')
     try:
-        parser.add_argument('-c', '--config', dest='config', type=str, help='Path to config file', required=True)
-        parser.add_argument('-f', '--filter', dest='filter', type=str, help='Path to filter file', required=True)
         args = parser.parse_args()
+        if args.config is None:
+            if args.host and args.port and args.user and \
+                    args.passwd and args.exchange and \
+                    args.routing_key and args.queue:
+                args.config = {}
+                args.config['host'] = args.host
+                args.config['port'] = args.port
+                args.config['user'] = args.user
+                args.config['pass'] = args.passwd
+                args.config['exchange'] = args.exchange
+                args.config['routing_key'] = args.routing_key
+                args.config['queue'] = args.queue
+                args.config['exchange_type'] = args.exchange_type
+                args.config['heartbeat'] = args.heartbeat
+                args.config['blocked_connection_timeout'] = args.blocked_connection_timeout
+            else:
+                parser.error("Wrong number of arguments!")
     except:
-        parser.print_help()
+        sys.exit(0)
 
     return args
 
@@ -64,16 +93,19 @@ if __name__ == "__main__":
     signals_trap()
     args = parse()
 
-
-    with open(args.config, 'r') as stream:
-        try:
-            config = yaml.load(stream)
-            logging.debug("Config file: {0} {1}".format(os.linesep, yaml.dump(config)))
-            # validate(config_yaml, schema)
-        except Exception as e:
-            logging.error("[ERROR] Parsing CONFIG file: {0} {1} Please, check the YAML format".format(e, os.linesep))
-            kill()
-            sys.exit(0)
+    if isinstance(args.config, dict):
+        config = args.config
+    else:
+        with open(args.config, 'r') as stream:
+            try:
+                config = yaml.load(stream)
+                print config
+                logging.debug("Config file: {0} {1}".format(os.linesep, yaml.dump(config)))
+                # validate(config_yaml, schema)
+            except Exception as e:
+                logging.error("[ERROR] Parsing CONFIG file: {0} {1} Please, check the YAML format".format(e, os.linesep))
+                kill()
+                sys.exit(0)
 
     publisher = LogPublisher(config, logging)
     publisher.start()
