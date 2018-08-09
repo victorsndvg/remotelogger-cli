@@ -7,23 +7,50 @@ NOTE: under development
 # Basic usage
 
 ```
-usage: Send your logs to remote endpoints [-h] -c CONFIG
+usage: Send your logs to remote endpoints [-h] -f FILTER [-c CONFIG]
+                                          [-sh HOST] [-u USER] [-p PASSWD]
+                                          [-e EXCHANGE] [-rk ROUTING_KEY]
+                                          [-q QUEUE] [-sp PORT]
+                                          [-et EXCHANGE_TYPE] [-hb HEARTBEAT]
+                                          [-bct BLOCKED_CONNECTION_TIMEOUT]
 
-optional arguments:
-  -h, --help            show this help message and exit
-  -c CONFIG, --config CONFIG
-                        Path to config file
 ```
 
 # Example
 
 ```
-$ remotelogger-cli.py --config test/config.yaml
+$ # Using a configuration file:
+$ remotelogger-cli.py --filter test/filter.yaml --config test/config.yaml 
+$ # Using command line arguments:
+$ remotelogger-cli.py --filter test/filter.yaml -sh localhost -u guest -p guest -e exchange -rk routing_key -q queue
 ```
 
 # Config file
 
-Configuration file points to the log files to follow and defines filters to categorize log lines. 
+The Config file is an alternative way to provide connection configuration parameters instead of passing them as command line arguments.
+
+## Config file example
+
+Configuration file is in YAML format
+
+```
+{
+    "host": "localhost",
+    "port": 5672,
+    "user": "guest",
+    "pass": "guest",
+    "exchange": "exchange",
+    "exchange_type": "direct",
+    "routing_key": "routing_key",
+    "queue": "queue",
+    "heartbeat": 0,
+    "blocked_connection_timeout": 300
+}
+```
+
+# Filter file
+
+Filter file points to the log files to follow and defines filters to categorize log lines. 
 
 Filters are based on regular expressions and uses https://docs.python.org/2/library/re.html[re] library to match patterns.
 
@@ -31,7 +58,6 @@ Once a log line is filtered, some properties can be defined per filter:
 
 - **severity**: Severity level of the message (_NONE, INFO, WARNING, ERROR, SUCCESS_)
 - **verbosity**: Verbosity level (_None or 0-5_)
-- **progress**: Percentage of progress (_0-100_)
 
 ## Regular expressions
 
@@ -41,7 +67,7 @@ Patterns https://docs.python.org/2/library/re.html#regular-expression-syntax[sin
 
 The filter feature is based on https://docs.python.org/2/library/re.html#re.match[re.match] function.
 
-## Config file example
+## Filter file example
 
 Configuration file is in YAML format.
 
@@ -50,15 +76,15 @@ Configuration file is in YAML format.
     {
         "filename": log.txt,
         "filters": [
-            {pattern: "^INFO", verbosity: 1, severity: 1, progress: 1}, 
-            {pattern: "^WARN", verbosity: 2, severity: 2, progress: 2}
+            {pattern: "^INFO", verbosity: 1, severity: 1}, 
+            {pattern: "^WARN", verbosity: 2, severity: 2}
         ]
     },
     {
         "filename": log2.txt,
         "filters": [
-            {pattern: "^ERROR", verbosity: 3, severity: 3, progress: 3}, 
-            {pattern: "^OK", verbosity: 4, severity: 4, progress: 4}
+            {pattern: "^ERROR", verbosity: 3, severity: 3}, 
+            {pattern: "^OK", verbosity: 4, severity: 4}
         ]
     }
 ]
