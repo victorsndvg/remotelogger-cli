@@ -209,23 +209,28 @@ class LogPublisher(object):
 
     def channel_close(self):
         self._logger.info('Closing channel')
-        self._channel.close()
+        if self._channel.is_open:
+            self._channel.close()
 
     def exchange_close(self):
-        self._logger.info('Clsing exchange: %s' % self._exchange)
-        self._channel.exchange_delete(exchange=self._exchange)
+        self._logger.info('Closing exchange: %s' % self._exchange)
+        if self._channel.is_open:
+            self._channel.exchange_delete(exchange=self._exchange)
 
     def queue_close(self):
         self._logger.info('Closing queue: %s' % self._queue)
-        self._channel.queue_delete(queue=self._queue)
+        if self._channel.is_open:
+            self._channel.queue_delete(queue=self._queue)
 
     def queue_unbind(self):
         self._logger.info('Unbinding queue "%s" from exchange "%s" with key "%s"' % (self._queue, self._exchange, self._topic))
-        self._channel.queue_unbind(queue=self._queue, exchange=self._exchange, routing_key=self._topic)
+        if self._channel.is_open:
+            self._channel.queue_unbind(queue=self._queue, exchange=self._exchange, routing_key=self._topic)
 
     def disconnect(self):
         self._logger.info('Disconnecting')
-        self._connection.close()
+        if self._connection.is_open:
+            self._connection.close()
 
     def connection_blocked_callback(self, unused_frame):
         self._logger.info('Connection blocked callback')

@@ -15,10 +15,8 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(message)s', date
 def kill():
     if publisher is not None:
         publisher.stop()
-        publisher = None
     if observer is not None:
         observer.stop()
-        observer = None
 
 def signal_handler(sig, frame):
     logging.info('Gracefully closing remotelogger (Signal: {signal}) ... '.format(signal=sig))
