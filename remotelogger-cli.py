@@ -19,7 +19,7 @@ def kill():
         observer.stop()
 
 def signal_handler(sig, frame):
-    logging.info('Gracefully closing remotelogger (Signal: {sinal}) ... '.format(signal=sig))
+    logging.info('Gracefully closing remotelogger (Signal: {signal}) ... '.format(signal=sig))
     kill()
     sys.exit(0)
 
