@@ -1,12 +1,12 @@
 {
-    "host": "localhost",
+    "host": "im.srv.cesga.es",
     "port": 5672,
-    "user": "guest",
-    "pass": "guest",
+    "user": "mso4sc",
+    "pass": "remotelogger",
     "exchange": "exchange",
     "exchange_type": "direct",
-    "routing_key": "routing_key",
-    "queue": "queue",
+    "routing_key": "routing_key2",
+    "queue": "queue11",
     "heartbeat": 0,
     "blocked_connection_timeout": 300
 }

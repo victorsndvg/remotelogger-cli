@@ -35,7 +35,7 @@ class RemoteLogConsumerDispacher(object):
 
     def exchange_open(self):
         if self._exchange: 
-            self._logger.info('Opening exchange: %s (%s)' % (self._exchange, self._exchange_type))
+            self._logger.debug('Opening exchange: %s (%s)' % (self._exchange, self._exchange_type))
             self._channel.exchange_declare(exchange=self._exchange, exchange_type=self._exchange_type)
 
     def queue_open(self):
@@ -50,7 +50,7 @@ class RemoteLogConsumerDispacher(object):
 
     def on_response(self, ch, method, props, body):
         if self._correlation_id == props.correlation_id:
-            self._logger.info('Dispatch response: %s' % body)
+            self._logger.debug('Dispatch response: %s' % body)
             self.response = body
 
     def disconnect(self):
@@ -74,11 +74,6 @@ class RemoteLogConsumerDispacher(object):
         self._logger.debug('Clossing callback queue')
         result = self._channel.queue_delete(self._queue)
 
-    def on_response(self, ch, method, props, body):
-        if self._correlation_id == props.correlation_id:
-            self._logger.info('Dispatch response: %s' % body)
-            self.response = body
-
     def dispatch(self, exchange, exchange_type, queue, routing_key):
         self.response = None
         message = json.dumps({'exchange':exchange, 'exchange_type':exchange_type, 'queue':queue, 'routing_key':routing_key})
@@ -90,7 +85,7 @@ class RemoteLogConsumerDispacher(object):
                                          correlation_id = self._correlation_id,
                                          ),
                                    body=message)
-        self._logger.info('Dispatch consumer on: %r' % message)
+        self._logger.debug('Dispatch consumer on: %r' % message)
         while self.response is None:
             self._connection.process_data_events()
         return self.response
@@ -164,7 +159,7 @@ class LogPublisher(object):
         self.start()
 
     def connect(self):
-        self._logger.info('Connecting: %s' % self._url)
+        self._logger.debug('Connecting: %s' % self._url)
         credentials = pika.PlainCredentials(self._user, self._pass) 
         parameters = pika.ConnectionParameters(host=self._host, port=self._port, credentials=credentials, heartbeat_interval=self._heartbeat) 
         self._connection = pika.BlockingConnection(parameters)
@@ -172,26 +167,26 @@ class LogPublisher(object):
         self._connection.add_on_connection_unblocked_callback(self.connection_unblocked_callback)
 
     def channel_open(self):
-        self._logger.info('Opening channel')
+        self._logger.debug('Opening channel')
         self._channel = self._connection.channel()
         self._channel.confirm_delivery()
         self._channel.add_on_cancel_callback(self.channel_cancel_callback)
         self._channel.add_on_return_callback(self.channel_return_callback)
 
     def exchange_open(self):
-        self._logger.info('Opening exchange: %s (%s)' % (self._exchange, self._exchange_type))
+        self._logger.debug('Opening exchange: %s (%s)' % (self._exchange, self._exchange_type))
         self._channel.exchange_declare(exchange=self._exchange, exchange_type=self._exchange_type)
 
     def queue_open(self):
-        self._logger.info('Opening queue: %s' % self._queue)
+        self._logger.debug('Opening queue: %s' % self._queue)
         self._channel.queue_declare(queue=self._queue)
 
     def queue_bind(self):
-        self._logger.info('Binding queue "%s" to exchange "%s" with key "%s"' % (self._queue, self._exchange, self._topic))
+        self._logger.debug('Binding queue "%s" to exchange "%s" with key "%s"' % (self._queue, self._exchange, self._topic))
         self._channel.queue_bind(queue=self._queue, exchange=self._exchange, routing_key=self._topic)
 
     def send(self, message):
-        self._logger.info('Sending message: %s' % message)
+        self._logger.debug('Sending message: %s' % message)
         delivery = self._channel.basic_publish(exchange=self._exchange, routing_key=self._topic, body=message,
                                            properties=pika.BasicProperties(content_type='application/json', delivery_mode=1), mandatory=True)
         if not delivery:
@@ -199,71 +194,71 @@ class LogPublisher(object):
 
     def on_delivery_confirmation(self, method_frame):
         confirmation_type = method_frame.method.NAME.split('.')[1].lower()
-        self._logger.info('Received %s for delivery tag: %i',confirmation_type, method_frame.method.delivery_tag)
+        self._logger.debug('Received %s for delivery tag: %i',confirmation_type, method_frame.method.delivery_tag)
         if confirmation_type == 'ack':
             self._acked += 1
         elif confirmation_type == 'nack':
             self._nacked += 1
         self._deliveries.remove(method_frame.method.delivery_tag)
-        self._logger.info('Published %i messages, %i have yet to be confirmed, %i were acked and %i were nacked', self._message_number, len(self._deliveries), self._acked, self._nacked)
+        self._logger.debug('Published %i messages, %i have yet to be confirmed, %i were acked and %i were nacked', self._message_number, len(self._deliveries), self._acked, self._nacked)
 
     def channel_close(self):
-        self._logger.info('Closing channel')
+        self._logger.debug('Closing channel')
         if self._channel.is_open:
             self._channel.close()
 
     def exchange_close(self):
-        self._logger.info('Closing exchange: %s' % self._exchange)
+        self._logger.debug('Closing exchange: %s' % self._exchange)
         if self._channel.is_open:
             self._channel.exchange_delete(exchange=self._exchange)
 
     def queue_close(self):
-        self._logger.info('Closing queue: %s' % self._queue)
+        self._logger.debug('Closing queue: %s' % self._queue)
         if self._channel.is_open:
             self._channel.queue_delete(queue=self._queue)
 
     def queue_unbind(self):
-        self._logger.info('Unbinding queue "%s" from exchange "%s" with key "%s"' % (self._queue, self._exchange, self._topic))
+        self._logger.debug('Unbinding queue "%s" from exchange "%s" with key "%s"' % (self._queue, self._exchange, self._topic))
         if self._channel.is_open:
             self._channel.queue_unbind(queue=self._queue, exchange=self._exchange, routing_key=self._topic)
 
     def disconnect(self):
-        self._logger.info('Disconnecting')
+        self._logger.debug('Disconnecting')
         if self._connection.is_open:
             self._connection.close()
 
     def connection_blocked_callback(self, unused_frame):
-        self._logger.info('Connection blocked callback')
+        self._logger.debug('Connection blocked callback')
 
     def connection_unblocked_callback(self, unused_frame):
-        self._logger.info('Connection unblocked callback')
+        self._logger.debug('Connection unblocked callback')
 
     def connection_backpressure_callback(self, unused_frame):
-        self._logger.info('Connection backpressure callback')
+        self._logger.debug('Connection backpressure callback')
 
     def connection_close_callback(self, unused_frame):
-        self._logger.info('Connection close callback')
+        self._logger.debug('Connection close callback')
 
     def connection_open_callback(self, unused_frame):
-        self._logger.info('Connection open callback')
+        self._logger.debug('Connection open callback')
 
     def connection_open_error_callback(self, unused_frame):
-        self._logger.info('Connection open_error callback')
+        self._logger.debug('Connection open_error callback')
 
     def channel_cancel_callback(self, unused_frame):
         self._logger.info('Channel cancel callback')
 
     def channel_return_callback(self, unused_frame):
-        self._logger.info('Channel return callback')
+        self._logger.debug('Channel return callback')
 
     def channel_callback(self, unused_frame):
-        self._logger.info('Channel callback')
+        self._logger.debug('Channel callback')
 
     def channel_close_callback(self, unused_frame):
-        self._logger.info('Channel close callback')
+        self._logger.debug('Channel close callback')
 
     def channel_flow_callback(self, unused_frame):
-        self._logger.info('Channel flow callback')
+        self._logger.debug('Channel flow callback')
 
 
 
