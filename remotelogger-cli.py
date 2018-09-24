@@ -33,7 +33,7 @@ def signals_trap():
 
 def log(path, filters, observer, publisher):
     dir = os.path.split(path)[0]
-    logging.info("File: {path}".format(path=path))
+    logging.info("Remotelogger observing file: {path}".format(path=path))
 
     logeventhandler = LogEventHandler(  path=path,
                                         filters=filters,
@@ -50,9 +50,8 @@ def parse():
     parser = argparse.ArgumentParser("Send your logs to remote endpoints")
     args = {'config': None, 'filter': None}
 
-
-    
-    parser.add_argument('-f', '--filter', dest='filter', type=str, help='Path to filter file', required=True)
+    parser.add_argument('-d', '--debug', dest='debug', help='Debug mode', action='store_true')    
+    parser.add_argument('-f', '--filter', dest='filter', type=str, help='Path to filter file', required=True)    
     parser.add_argument('-c', '--config', dest='config', type=str, help='Path to config file')
     parser.add_argument('-sh', '--host', dest='host', type=str, default='localhost', help='Server host')
     parser.add_argument('-u', '--user', dest='user', type=str, default='guest', help='Server username')
@@ -66,6 +65,8 @@ def parse():
     parser.add_argument('-bct', '--blocked_connection_timeout', dest='blocked_connection_timeout', type=int, default=300, help='Blocked connection timeout')
     try:
         args = parser.parse_args()
+        if args.debug:
+            logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
         if args.config is None:
             if args.host and args.port and args.user and \
                     args.passwd and args.exchange and \
@@ -99,7 +100,6 @@ if __name__ == "__main__":
         with open(args.config, 'r') as stream:
             try:
                 config = yaml.load(stream)
-                print config
                 logging.debug("Config file: {0} {1}".format(os.linesep, yaml.dump(config)))
                 # validate(config_yaml, schema)
             except Exception as e:
