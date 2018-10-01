@@ -76,15 +76,15 @@ Configuration file is in YAML format.
     {
         "filename": log.txt,
         "filters": [
-            {pattern: "^INFO", verbosity: 1, severity: 1}, 
-            {pattern: "^WARN", verbosity: 2, severity: 2}
+            {pattern: "^INFO", severity: "INFO"}, 
+            {pattern: "^WARN", severity: "WARNING"}
         ]
     },
     {
         "filename": log2.txt,
         "filters": [
-            {pattern: "^ERROR", verbosity: 3, severity: 3}, 
-            {pattern: "^OK", verbosity: 4, severity: 4}
+            {pattern: "^ERROR", severity: "ERROR"}, 
+            {pattern: "^OK", severity: "OK" }
         ]
     }
 ]
