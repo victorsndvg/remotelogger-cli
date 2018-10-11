@@ -118,8 +118,8 @@ if __name__ == "__main__":
             # validate(filters_yaml, schema)
             for rule in filters_yaml:
                 filters = []
-                for filter in rule['filters']:
-                    filters.append(LogFilter(**filter))
+                for afilter in rule['filters']:
+                    filters.append(LogFilter(afilter))
                 log(os.path.abspath(rule['filename']), filters, observer, publisher)  
         except Exception as e:
             logging.error("[ERROR] Parsing FILTER file: {0} {1} Please, check the YAML format".format(e, os.linesep))
