@@ -6,8 +6,6 @@ class LogFilter():
         self.pattern = attributes.pop('pattern')
         self.attributes = attributes
         self.regex      = re.compile(self.pattern)
-        print(self.attributes)
-        print(self.to_json('blah'))
 
     def match(self, string):
         return self.regex.match(string)
