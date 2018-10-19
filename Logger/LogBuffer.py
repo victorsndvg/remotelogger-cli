@@ -1,6 +1,6 @@
 #!/usr/bin/env python
-import os, re, json
-from LogFilter import LogFilter, LogFilterSet
+import os, re, json, logging
+from LogFilter import LogFilter, LogFilterSet, LogSkipException
 
 
 class LogBuffer():
@@ -11,8 +11,10 @@ class LogBuffer():
         self.stack = []
 
     def append(self, string):
-        self.stack.append(self.filters.apply(string))
-        #print self.filters.apply(string)
+        try:
+            self.stack.append(self.filters.apply(string))
+        except LogSkipException as skip:
+            logging.debug(str(skip))
 
     def push(self, string):
         self.temp += string
@@ -31,5 +33,4 @@ class LogBuffer():
     def pop(self):
         if self.stack:
             return self.stack.pop(0)
-
 
