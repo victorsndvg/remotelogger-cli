@@ -14,7 +14,7 @@ class LogFilter():
         self.pattern    = attributes.pop('pattern')
         self.regex      = re.compile(self.pattern)
         self.action     = getattr(self.regex, attributes.pop('action', 'match'), self.regex.match)
-        self.serialize  = self.skip if attributes.pop('ignore', False) else self.to_json
+        self.serialize  = self.skip if attributes.pop('skip', False) else self.to_json
         self.attributes = attributes
 
     def skip(self, string):
